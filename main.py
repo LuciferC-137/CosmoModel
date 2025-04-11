@@ -56,27 +56,30 @@ def a_solve(t: np.ndarray, ainit: float, log: bool = False) -> np.ndarray:
 
 def particule_horizon(a:callable, t: float, tmin: float = 0) -> float:
     """Particle horizon comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr  * quad(lambda x: 1 / a(x), tmin, t)[0]
+    return Units.a0 * Units.c_Glyr_per_Gyr \
+        * quad(lambda x: 1 / a(x), tmin, t)[0]
 
 def event_horizon(a:callable, t: float, t_max: float) -> float:
     """Event horizon comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr * quad(lambda x: 1 / a(x), t, t_max)[0]
+    return Units.a0 * Units.c_Glyr_per_Gyr \
+        * quad(lambda x: 1 / a(x), t, t_max)[0]
 
 def hubble_sphere(a:callable, t: float) -> float:
     """Hubble sphere comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr / friedmann(t, a(t))
+    return Units.a0 * Units.c_Glyr_per_Gyr / friedmann(t, a(t))
 
 def light_cone(a:callable, tem: float) -> float:
     """Light cone comoving distance. (Glyr)"""
     if (tem > Units.today):
         return np.nan
-    return Units.c_Glyr_per_Gyr * quad(lambda x: 1 / a(x), tem, Units.today)[0]
+    return Units.a0 * Units.c_Glyr_per_Gyr \
+        * quad(lambda x: 1 / a(x), tem, Units.today)[0]
 
 # ------------------------ CONFORMAL TIME ------------------------
 
 def conformal_time(a: callable, t: float, tmin: float) -> float:
     """Conformal time. (Gyr)"""
-    return quad(lambda x: 1 / a(x), tmin, t)[0]
+    return Units.a0 * quad(lambda x: 1 / a(x), tmin, t)[0]
 
 def particle_horizon_conformal(t: float, tmin: float = 0) -> float:
     """Particle horizon comoving distance. (Glyr)"""
@@ -89,7 +92,7 @@ def event_horizon_conformal(t: float, t_max: float) -> float:
 def hubble_sphere_conformal(a: callable, t: float) -> float:
     # DOES NOT WORK
     """Hubble sphere comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr * a(t) / Units.H0_per_Gyr / E(z(a, t))
+    return Units.c_Glyr_per_Gyr * a(t) / Units.H0_per_Gyr / Units.a0 / E(z(a, t))
 
 def light_cone_conformal(today_conformal: float, tem: float) -> float:
     """Light cone comoving distance. (Glyr)"""
@@ -97,9 +100,11 @@ def light_cone_conformal(today_conformal: float, tem: float) -> float:
         return np.nan
     return Units.c_Glyr_per_Gyr * (today_conformal - tem)
 
+# ---------------- CONVERTING REDSHIFT TO DISTANCE ----------------
+
 def chi_from_z(z: float) -> float:
     """Comoving distance from redshift z to today (Glyr)."""
-    return Units.c_Glyr_per_Gyr / Units.H0_per_Gyr \
+    return Units.c_Glyr_per_Gyr / Units.H0_per_Gyr / Units.a0 \
         * quad(lambda x: 1 / E(x), 0, z)[0]
 
 def iso_chi(a: callable, t: np.ndarray, chi: float) -> np.ndarray:

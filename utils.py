@@ -135,8 +135,8 @@ class Units:
     Omega_lambda = 0.7  # Dark energy density parameter
 
     today = 13.7  # Age of the universe in Gyr
-    a0 = 6.0  # Scale factor today
-    ainit = 1e-3  # Initial scale factor
+    a0 = 1.0  # Scale factor today
+    ainit = 1e-3  # Initial scale factor for integration
 
     sec_in_yr = 365.25 * 86400
     sec_in_Gyr = sec_in_yr * 1e9
@@ -150,7 +150,7 @@ class Units:
     @staticmethod
     def proper(a: callable, t: np.ndarray, d: np.ndarray) -> np.ndarray:
         """Proper distance from scale factor, time and comoving distance."""
-        return a(t) * d
+        return a(t) / Units.a0 * d
     
     @staticmethod
     def convert_to_proper(a: callable, data: DataHolder):
@@ -205,7 +205,8 @@ class FilteredOutput:
     
     def print_number_of_warnings(self):
         print(f"During the procedure, {self._number_of_erased_entry} "
-              "warnings were erased.\n")
+              "warnings were erased. They were likely "
+              "raised during integrations, nothing to worry about.\n")
     
     def restore_stdout(self):
         sys.stdout = self.original_stdout
