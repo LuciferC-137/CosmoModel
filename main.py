@@ -1,9 +1,9 @@
 import numpy as np
-from scipy.integrate import solve_ivp, quad
 from scipy.interpolate import interp1d
 from utils import DataHolder, Units
 from plotter import Plotter
 from logger import FilteredOutput, Logger
+from cosmo_methods import *
 
 Logger().log("Starting...")
 
@@ -11,145 +11,29 @@ Logger().log("Starting...")
 # all print() functions must explicitly end with '\n' to make a new line.
 FilteredOutput.on()
 
-# ---------------------------- SOLVER METHODS -------------------------
-
-def z(a: callable, t: np.ndarray) -> np.ndarray:
-    """Redshift. Parameter 'a' can be a function or an array."""
-    if isinstance(a, float) or isinstance(a, np.ndarray):
-        return Units.a0 / a - 1
-    return Units.a0 / a(t) - 1
-
-def E(z: np.ndarray) -> np.ndarray:
-    """Dimensionless Hubble parameter."""
-    return np.sqrt(#Units.Omega_r * (1 + z)**4 
-                   + Units.Omega_m * (1 + z)**3
-                   + Units.Omega_lambda)
-
-def friedmann(t: float, a: float) -> float:
-    """
-    Define the differential equation on a(t) to solve Friedmann's equation.
-    """
-    dadt = Units.H0_per_Gyr * a * E(z(a, t))
-    return dadt
-
-def log_friedmann(logt: float, a: float) -> float:
-    """
-    Define the differential equation on a logarithmic time scale
-    to solve Friedmann's equation.
-    """
-    dadt = Units.H0_per_Gyr * np.log(10) * a * np.power(10, logt) \
-        * E(z(a, 10**logt))
-    return dadt
-
-def a_analytic(tGy: np.ndarray) -> np.ndarray:
-    """
-    This is the analytic solution of the Friedmann equation for a universe with
-    matter and lambda:
-    """
-    a_origin = Units.a0 * np.power(tGy[0] / Units.today, 2/3)
-    t = tGy * Units.sec_in_Gyr
-    A = np.power(np.sinh(np.sqrt(3 * Units.Lambda / 4) * t[0]), -2/3) * a_origin
-    return A * np.power(np.sinh(np.sqrt(3 * Units.Lambda / 4) * t), 2/3)
-
-def a_solve(t: np.ndarray, ainit: float, log: bool = False) -> np.ndarray:
-    """Scale factor."""
-    if log:
-        return solve_ivp(friedmann, (t[0], t[-1]), [ainit], t_eval=t)
-    return solve_ivp(log_friedmann, (t[0], t[-1]), [ainit], t_eval=t)
-
-# ------------------------ REGULAR TIME ------------------------
-
-def particule_horizon(a:callable, t: float, tmin: float = 0) -> float:
-    """Particle horizon comoving distance. (Glyr)"""
-    return Units.a0 * Units.c_Glyr_per_Gyr \
-        * quad(lambda x: 1 / a(x), tmin, t)[0]
-
-def event_horizon(a:callable, t: float, t_max: float) -> float:
-    """Event horizon comoving distance. (Glyr)"""
-    return Units.a0 * Units.c_Glyr_per_Gyr \
-        * quad(lambda x: 1 / a(x), t, t_max)[0]
-
-def hubble_sphere(a:callable, t: float) -> float:
-    """Hubble sphere comoving distance. (Glyr)"""
-    return Units.a0 * Units.c_Glyr_per_Gyr / friedmann(t, a(t))
-
-def light_cone(a:callable, tem: float) -> float:
-    """Light cone comoving distance. (Glyr)"""
-    if (tem > Units.today):
-        return np.nan
-    return Units.a0 * Units.c_Glyr_per_Gyr \
-        * quad(lambda x: 1 / a(x), tem, Units.today)[0]
-
-# ------------------------ CONFORMAL TIME ------------------------
-
-def conformal_time(a: callable, t: float, tmin: float) -> float:
-    """Conformal time. (Gyr)"""
-    return Units.a0 * quad(lambda x: 1 / a(x), tmin, t)[0]
-
-def particle_horizon_conformal(t: float, tmin: float = 0) -> float:
-    """Particle horizon comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr * (t - tmin)
-
-def event_horizon_conformal(t: float, t_max: float) -> float:
-    """Event horizon comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr * (t_max - t)
-
-def hubble_sphere_conformal(a: callable, t: float) -> float:
-    # DOES NOT WORK
-    """Hubble sphere comoving distance. (Glyr)"""
-    return Units.c_Glyr_per_Gyr * a(t) / Units.H0_per_Gyr / Units.a0 / E(z(a, t))
-
-def light_cone_conformal(today_conformal: float, tem: float) -> float:
-    """Light cone comoving distance. (Glyr)"""
-    if (tem > today_conformal):
-        return np.nan
-    return Units.c_Glyr_per_Gyr * (today_conformal - tem)
-
-# ---------------- CONVERTING REDSHIFT TO DISTANCE ----------------
-
-def chi_from_z(z: float) -> float:
-    """Comoving distance from redshift z to today (Glyr)."""
-    return Units.c_Glyr_per_Gyr / Units.H0_per_Gyr / Units.a0 \
-            * quad(lambda x: 1 / E(x), 0, z)[0]    
-
-def iso_chi(a: callable, t: np.ndarray, chi: float) -> np.ndarray:
-    """Isochrone redshift. (Glyr)"""
-    return a(t) * chi
 
 # ---------------------- COMPILED FUNCTIONS ----------------------
 
 def horizons(a: callable, time: np.ndarray, large_time: np.ndarray) -> tuple:
     """Return all horizons."""
     # Particle Horizon
-    n = len(time)
-    p_h = np.zeros(n)
-    for i in range(n):
-        Logger().log_prc("Particle horizon distance", i, n)
-        p_h[i] = particule_horizon(a, time[i], tmin=large_time[0])
-    Logger().log_prc_done("Particle horizon distance")
+    p_h = particule_horizon(a(large_time), time, large_time)
+    Logger().log_prc_done("Particle horizon")
 
     # Event Horizon
-    e_h = np.zeros(n)
-    for i in range(n):
-        Logger().log_prc("Event horizon distance", i, n)
-        e_h[i] = event_horizon(a, time[i], t_max=large_time[-1])
-    Logger().log_prc_done("Event horizon distance")
+    e_h = event_horizon(a(large_time), time, large_time)
+    Logger().log_prc_done("Event horizon")
     
     # Hubble Sphere
-    h_s = np.zeros(n)
-    for i in range(n):
-        Logger().log_prc("Hubble sphere distance", i, n)
-        h_s[i] = hubble_sphere(a, time[i])
-    Logger().log_prc_done("Hubble sphere distance")
+    h_s = hubble_sphere(a(time), time)
+    Logger().log_prc_done("Hubble sphere")
     
     # Light Cone
-    l_c = np.zeros(n)
-    for i in range(n):
-        Logger().log_prc("Light cone distance", i, n)
-        l_c[i] = light_cone(a, time[i])
-    Logger().log_prc_done("Light cone distance")
+    l_c = light_cone(a(time), time)
+    Logger().log_prc_done("Light cone")
 
     return p_h, e_h, h_s, l_c
+
 
 def horizons_conformal(a: callable, time_conform: np.ndarray,
                        large_time: np.ndarray) -> tuple:
@@ -157,36 +41,33 @@ def horizons_conformal(a: callable, time_conform: np.ndarray,
     n = len(time_conform)
     p_h_comform = np.zeros(n)
     for i in range(n):
-        Logger().log_prc("Particle horizon conformal distance", i, n)
+        Logger().log_prc("Particle horizon conformal", i, n)
         p_h_comform[i] = particle_horizon_conformal(time_conform[i], tmin=0)
     Logger().log_prc_done("Particle horizon conformal distance")
 
     e_h_comform = np.zeros(n)
     for i in range(n):
-        Logger().log_prc("Event horizon conformal distance", i, n)
+        Logger().log_prc("Event horizon conformal", i, n)
         e_h_comform[i] = event_horizon_conformal(time_conform[i],
                                                  t_max=time_conform[-1])
-    Logger().log_prc_done("Event horizon conformal distance")
+    Logger().log_prc_done("Event horizon conformal")
 
-    h_s_comform = np.zeros(n)
-    for i in range(n):
-        Logger().log_prc("Hubble sphere conformal distance", i, n)
-        h_s_comform[i] =  hubble_sphere(a, large_time[i])
-    Logger().log_prc_done("Hubble sphere conformal distance")
+    h_s_comform =  hubble_sphere(a(large_time), large_time[i])
+    Logger().log_prc_done("Hubble sphere conformal")
 
     l_c_comform = np.zeros(n)
     for i in range(n):
-        Logger().log_prc("Light cone conformal distance", i, n)
+        Logger().log_prc("Light cone conformal", i, n)
         l_c_comform[i] = light_cone_conformal(today_conformal, time_conform[i])
-    Logger().log_prc_done("Light cone conformal distance")
+    Logger().log_prc_done("Light cone conformal")
 
     return p_h_comform, e_h_comform, h_s_comform, l_c_comform
     
 
 # ------------------------- MAIN -------------------------
 
-RECALC_PROPER_AND_COM = False
-RECALC_CONFORMAL = False
+RECALC_PROPER_AND_COM = True
+RECALC_CONFORMAL = True
 SAVE = True
 
 # NOTE : if you change the time scale, you need to recalculate everything,
@@ -199,15 +80,12 @@ sol = a_solve(large_time, ainit=Units.ainit, log=True)  # Scale factor
 a_vals : np.ndarray = sol.y[0]
 large_time = sol.t  # Time in Gyr
 a = interp1d(large_time, a_vals)  # Interpolated scale factor
+a_vals_full = a(large_time)
 today_conformal = conformal_time(a, Units.today, tmin=large_time[0])
 
 if RECALC_CONFORMAL:
-    Logger().log("Beginning conformal time calculations...")
-    time_conform = np.zeros(len(large_time)) # Conformal Time in Gyr
-    for i in range(len(large_time)):
-        Logger().log_prc("Conformal time", i, len(large_time))
-        time_conform[i] = conformal_time(a, large_time[i], large_time[0])
-    Logger().log_prc_done("Conformal time")
+   
+    time_conform = conformal_time_vect(a_vals_full, large_time)
 
     p_h, e_h, h_s, l_c = horizons_conformal(a, time_conform, large_time)
 
