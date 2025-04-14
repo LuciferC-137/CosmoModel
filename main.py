@@ -1,8 +1,11 @@
 import numpy as np
 from scipy.integrate import solve_ivp, quad
 from scipy.interpolate import interp1d
-from utils import DataHolder, Units, FilteredOutput
+from utils import DataHolder, Units
 from plotter import Plotter
+from logger import FilteredOutput, Logger
+
+Logger().log("Starting...")
 
 # Filtering warnings for a cleaner output. When this is on, 
 # all print() functions must explicitly end with '\n' to make a new line.
@@ -18,7 +21,9 @@ def z(a: callable, t: np.ndarray) -> np.ndarray:
 
 def E(z: np.ndarray) -> np.ndarray:
     """Dimensionless Hubble parameter."""
-    return np.sqrt(Units.Omega_m * (1 + z)**3 + Units.Omega_lambda)
+    return np.sqrt(#Units.Omega_r * (1 + z)**4 
+                   + Units.Omega_m * (1 + z)**3
+                   + Units.Omega_lambda)
 
 def friedmann(t: float, a: float) -> float:
     """
@@ -105,7 +110,7 @@ def light_cone_conformal(today_conformal: float, tem: float) -> float:
 def chi_from_z(z: float) -> float:
     """Comoving distance from redshift z to today (Glyr)."""
     return Units.c_Glyr_per_Gyr / Units.H0_per_Gyr / Units.a0 \
-        * quad(lambda x: 1 / E(x), 0, z)[0]
+            * quad(lambda x: 1 / E(x), 0, z)[0]    
 
 def iso_chi(a: callable, t: np.ndarray, chi: float) -> np.ndarray:
     """Isochrone redshift. (Glyr)"""
@@ -116,55 +121,72 @@ def iso_chi(a: callable, t: np.ndarray, chi: float) -> np.ndarray:
 def horizons(a: callable, time: np.ndarray, large_time: np.ndarray) -> tuple:
     """Return all horizons."""
     # Particle Horizon
-    p_h = np.zeros(len(time))
-    for i in range(len(time)):
+    n = len(time)
+    p_h = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Particle horizon distance", i, n)
         p_h[i] = particule_horizon(a, time[i], tmin=large_time[0])
+    Logger().log_prc_done("Particle horizon distance")
 
     # Event Horizon
-    e_h = np.zeros(len(time))
-    for i in range(len(time)):
+    e_h = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Event horizon distance", i, n)
         e_h[i] = event_horizon(a, time[i], t_max=large_time[-1])
+    Logger().log_prc_done("Event horizon distance")
     
     # Hubble Sphere
-    h_s = np.zeros(len(time))
-    for i in range(len(time)):
+    h_s = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Hubble sphere distance", i, n)
         h_s[i] = hubble_sphere(a, time[i])
+    Logger().log_prc_done("Hubble sphere distance")
     
     # Light Cone
-    l_c = np.zeros(len(time))
-    for i in range(len(time)):
+    l_c = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Light cone distance", i, n)
         l_c[i] = light_cone(a, time[i])
+    Logger().log_prc_done("Light cone distance")
 
     return p_h, e_h, h_s, l_c
 
 def horizons_conformal(a: callable, time_conform: np.ndarray,
                        large_time: np.ndarray) -> tuple:
     """Return all horizons in conformal time."""
-
-    p_h_comform = np.zeros(len(time_conform))
-    for i in range(len(time_conform)):
+    n = len(time_conform)
+    p_h_comform = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Particle horizon conformal distance", i, n)
         p_h_comform[i] = particle_horizon_conformal(time_conform[i], tmin=0)
+    Logger().log_prc_done("Particle horizon conformal distance")
 
-    e_h_comform = np.zeros(len(time_conform))
-    for i in range(len(time_conform)):
+    e_h_comform = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Event horizon conformal distance", i, n)
         e_h_comform[i] = event_horizon_conformal(time_conform[i],
                                                  t_max=time_conform[-1])
+    Logger().log_prc_done("Event horizon conformal distance")
 
-    h_s_comform = np.zeros(len(large_time))
-    for i in range(len(large_time)):
+    h_s_comform = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Hubble sphere conformal distance", i, n)
         h_s_comform[i] =  hubble_sphere(a, large_time[i])
+    Logger().log_prc_done("Hubble sphere conformal distance")
 
-    l_c_comform = np.zeros(len(time_conform))
-    for i in range(len(time_conform)):
+    l_c_comform = np.zeros(n)
+    for i in range(n):
+        Logger().log_prc("Light cone conformal distance", i, n)
         l_c_comform[i] = light_cone_conformal(today_conformal, time_conform[i])
+    Logger().log_prc_done("Light cone conformal distance")
 
     return p_h_comform, e_h_comform, h_s_comform, l_c_comform
     
 
 # ------------------------- MAIN -------------------------
 
-RECALC_PROPER_AND_COM = True
-RECALC_CONFORMAL = True
+RECALC_PROPER_AND_COM = False
+RECALC_CONFORMAL = False
 SAVE = True
 
 # NOTE : if you change the time scale, you need to recalculate everything,
@@ -172,6 +194,7 @@ SAVE = True
 
 # COMMON PART : Time and Scale Factor
 large_time = np.logspace(-10, 10, 10000)
+Logger().log("Calculating scale factor (handled by solve_ivp)...")
 sol = a_solve(large_time, ainit=Units.ainit, log=True)  # Scale factor
 a_vals : np.ndarray = sol.y[0]
 large_time = sol.t  # Time in Gyr
@@ -179,9 +202,12 @@ a = interp1d(large_time, a_vals)  # Interpolated scale factor
 today_conformal = conformal_time(a, Units.today, tmin=large_time[0])
 
 if RECALC_CONFORMAL:
+    Logger().log("Beginning conformal time calculations...")
     time_conform = np.zeros(len(large_time)) # Conformal Time in Gyr
     for i in range(len(large_time)):
+        Logger().log_prc("Conformal time", i, len(large_time))
         time_conform[i] = conformal_time(a, large_time[i], large_time[0])
+    Logger().log_prc_done("Conformal time")
 
     p_h, e_h, h_s, l_c = horizons_conformal(a, time_conform, large_time)
 
@@ -198,7 +224,7 @@ else:
     a = interp1d(data_conform.large_time, data_conform.a_vals)
 
 if RECALC_PROPER_AND_COM:
-    # Data intervals
+    Logger().log("Beginning proper and comoving distance calculations...")
     time = np.linspace(large_time[0], 25, 1000)  # Time in Gyr
 
     p_h, e_h, h_s, l_c = horizons(a, time, large_time)
@@ -223,11 +249,13 @@ else:
 # Calculating worldlines (or isochrones) for different redshifts for the
 # proper distance plot.
 time = np.linspace(large_time[0], 25, 1000)
-zs = [1, 3, 10, 1000]
+zs = [0, 1, 3, 10, 1000, 1e10]
 chis = [chi_from_z(z) for z in zs]
 worldlines = []
 for chi in chis:
+    Logger().log_prc("Calculating worldlines", chi, chis[-1])
     worldlines.append(iso_chi(a, time, chi))
+Logger().log_prc_done("Calculating worldlines")
 
 Plotter.plot_horizons(data, a, name="horizons_proper",  worldlines=worldlines,
                       x_label="Proper Distance (Glyr)")

@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from utils import DataHolder, Units
+from logger import Logger
 
 
 class Plotter:
@@ -19,7 +20,7 @@ class Plotter:
                       worldlines: list[np.ndarray] = [],
                       name: str = "horizons",
                       x_label: str = "Distance (Glyr)",
-                      y_label: str = "Time (Glyr)") -> None:
+                      y_label: str = "Time (Gyr)") -> None:
         fig, ax = plt.subplots(figsize=(12, 4))
         Plotter.sym_plot(ax, data.p_h, data.time,
                           label='Particle Horizon', color='blue')
@@ -51,7 +52,7 @@ class Plotter:
         if name[:-4] != ".png":
             name += ".png"
         plt.savefig(name, dpi=300, bbox_inches='tight')
-        print(f"Figure saved as '{name}'\n")
+        Logger().log(f"Figure saved as '{name}'")
 
     @staticmethod
     def plot_scale_factor(data: DataHolder, a_analytic: callable) -> None:
@@ -63,9 +64,10 @@ class Plotter:
                  label='Scale Factor', color='green')
         ax1.plot(data.large_time, a_analytic_vals, '--',
                  label='Analytic Scale Factor', color='orange')
-        ax1.set_yscale('log') 
+        ax1.set_xscale('log') 
         ax1.set_xlabel('Time (Gyr)')
         ax1.set_ylabel('Scale Factor')
+        ax1.legend()
         ax1.set_title('Scale Factor ' + r"[0; 1000] Gyr" + ' (Log Scale)')
         mask = data.large_time < 50
         large_time = data.large_time[mask]
@@ -73,9 +75,15 @@ class Plotter:
         a_analytic_vals = a_analytic_vals[mask]
         ax2.plot(large_time, a_vals, label='Scale Factor', color='green')
         ax2.plot(large_time, a_analytic_vals, '--',
-                 label='Analytic Scale Factor', color='orange') 
+                 label='Analytic Scale Factor', color='orange')
         ax2.set_xlabel('Time (Gyr)')
+        ax2.legend()
         ax2.set_ylabel('Scale Factor')
         ax2.set_title('Scale Factor '+ r"[0; 50] Gyr" + '(Linear Scale)')
         plt.savefig('scale_factor.png', dpi=300, bbox_inches='tight')
-        print(f"Figure saved as 'scale_factor.png'\n")
+        Logger().log(f"Figure saved as 'scale_factor.png'")
+
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.plot(large_time, a_vals / a_analytic_vals,
+                 label='Ratio', color='blue')
+        plt.savefig('scale_factor_ratio.png', dpi=300, bbox_inches='tight')

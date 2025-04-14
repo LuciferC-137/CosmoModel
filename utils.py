@@ -1,7 +1,6 @@
 import os
-import sys
-import warnings
 import numpy as np
+from logger import Logger
 
 
 def notnull(func):
@@ -64,6 +63,7 @@ class DataHolder:
         self._e_h = DataHolder.load_array(os.path.join(folder, 'e_h.txt'))
         self._h_s = DataHolder.load_array(os.path.join(folder, 'h_s.txt'))
         self._l_c = DataHolder.load_array(os.path.join(folder, 'l_c.txt'))
+        Logger().log(f"Data loaded successfully from: {folder}")
     
     def save_data(self, folder: str = "saved") -> None:
         """Save data to files."""
@@ -75,7 +75,7 @@ class DataHolder:
         DataHolder.save_array(self.e_h, os.path.join(folder, 'e_h.txt'))
         DataHolder.save_array(self.h_s, os.path.join(folder, 'h_s.txt'))
         DataHolder.save_array(self.l_c, os.path.join(folder, 'l_c.txt'))
-        print(f"Data saved successfully at: {folder}\n")
+        Logger().log(f"Data saved successfully at: {folder}")
 
     def copy_from(self, data: 'DataHolder'):
         self.set_all(data.a_vals, data.large_time, data.time,
@@ -130,13 +130,14 @@ class DataHolder:
 class Units:
     """Class to hold constants."""
     c = 299792.458  # Speed of light in km/s
-    H0 = 70.0  # Hubble constant in s^-1 (converted from km/s/Mpc)
-    Omega_m = 0.3  # Matter density parameter
-    Omega_lambda = 0.7  # Dark energy density parameter
+    H0 = 67.15  # Hubble constant in s^-1 (converted from km/s/Mpc)
+    Omega_m = 0.315  # Matter density parameter
+    Omega_r = 0.000092136  # Radiation density parameter
+    Omega_lambda = 1 - Omega_m - Omega_r # Dark energy density parameter
 
-    today = 13.7  # Age of the universe in Gyr
+    today = 13.842  # Age of the universe in Gyr
     a0 = 1.0  # Scale factor today
-    ainit = 1e-3  # Initial scale factor for integration
+    ainit = 1e-10  # Initial scale factor for integration.
 
     sec_in_yr = 365.25 * 86400
     sec_in_Gyr = sec_in_yr * 1e9
@@ -160,53 +161,3 @@ class Units:
         data._h_s = Units.proper(a, data.time, data.h_s)
         data._l_c = Units.proper(a, data.time, data.l_c)
 
-
-class FilteredOutput:
-
-    def __init__(self, forbidden_keywords: list[str] = []):
-        self.forbidden_keywords = forbidden_keywords
-        self.original_stdout = sys.stdout # Save the original stdout
-        self._number_of_erased_entry = 0
-    
-    @staticmethod
-    def on():
-        """Initialize the filtered output."""
-        if (sys.stdout is not None and isinstance(sys.stdout, FilteredOutput)):
-            print("FilteredOutput is already active.")
-            return
-        warnings.simplefilter("always")  # Ensure all warnings are caught
-        # Redirecting warnings to a the standard output
-        warnings.showwarning = lambda message, category, filename, lineno,\
-              file=None, line=None: \
-            print(f"{category.__name__}: {message}")
-        # Redirecting stdout to the FilteredOutput class
-        sys.stdout = FilteredOutput(forbidden_keywords=["RuntimeWarning",
-                                                        "IntegrationWarning"])
-
-    @staticmethod
-    def off():
-        """Close the filtered output."""
-        if (sys.stdout is not None and isinstance(sys.stdout, FilteredOutput)):
-            sys.stdout.print_number_of_warnings()
-            sys.stdout.restore_stdout()
-        else:
-            print("FilteredOutput was not active.")
-
-    def write(self, message: str):
-        # Ignore messages containing forbidden keywords or empty lines
-        if not message.strip():  # Ignore empty or whitespace-only messages
-            return
-        if any(keyword in message for keyword in self.forbidden_keywords):
-            self._number_of_erased_entry += 1
-            return
-        self.original_stdout.write(message)  # Write allowed messages
-    def flush(self):
-        self.original_stdout.flush()
-    
-    def print_number_of_warnings(self):
-        print(f"During the procedure, {self._number_of_erased_entry} "
-              "warnings were erased. They were likely "
-              "raised during integrations, nothing to worry about.\n")
-    
-    def restore_stdout(self):
-        sys.stdout = self.original_stdout
