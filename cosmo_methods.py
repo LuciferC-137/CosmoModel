@@ -15,8 +15,8 @@ def z(a, t: np.ndarray) -> np.ndarray:
 
 def E(z: np.ndarray) -> np.ndarray:
     """Dimensionless Hubble parameter."""
-    return np.sqrt(#Units.Omega_r * (1 + z)**4 
-                   + Units.Omega_m * (1 + z)**3
+    return np.sqrt(Units.Omega_r * np.power(1 + z, 4) 
+                   + Units.Omega_m * np.power(1 + z, 3)
                    + Units.Omega_lambda)
 
 def friedmann(t: np.ndarray, a: np.ndarray) -> np.ndarray:
@@ -40,6 +40,8 @@ def a_analytic(tGy: np.ndarray) -> np.ndarray:
     This is the analytic solution of the Friedmann equation for a universe with
     matter and lambda:
     """
+    if (Units.Omega_m == 1.):
+        return Units.a0 * np.power(tGy / Units.today, 2/3)
     a_origin = Units.a0 * np.power(tGy[0] / Units.today, 2/3)
     t = tGy * Units.sec_in_Gyr
     A = np.power(np.sinh(np.sqrt(3 * Units.Lambda / 4) * t[0]), -2/3) * a_origin
@@ -114,7 +116,7 @@ def light_cone_conformal(today_conformal: float, tem: float) -> float:
 def chi_from_z(z: float) -> float:
     """Comoving distance from redshift z to today (Glyr)."""
     return Units.c_Glyr_per_Gyr / Units.H0_per_Gyr / Units.a0 \
-            * quad(lambda x: 1 / E(x), 0, z)[0]    
+            * quad(lambda x: 1. / E(x), 0, z)[0]
 
 def iso_chi(a: callable, t: np.ndarray, chi: float) -> np.ndarray:
     """Isochrone redshift. (Glyr)"""

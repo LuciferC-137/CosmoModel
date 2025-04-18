@@ -17,8 +17,8 @@ class Plotter:
     
     @staticmethod
     def plot_horizons(data: DataHolder, a: callable, today: float = Units.today,
-                      worldlines: list[np.ndarray] = [],
                       name: str = "horizons",
+                      worldlines: tuple[np.ndarray, list[np.ndarray]] = ([], []),
                       x_label: str = "Distance (Glyr)",
                       y_label: str = "Time (Gyr)") -> None:
         fig, ax = plt.subplots(figsize=(12, 4))
@@ -30,9 +30,18 @@ class Plotter:
                           label='Hubble Sphere', color='purple')
         Plotter.sym_plot(ax, data.l_c, data.time,
                           label='Light Cone', color='black')
-        for d in worldlines:
+        
+        #Plotting z-lines and their associated values of z
+        for i in range(len(worldlines[0])):
+            d = worldlines[1][i]
+            z = worldlines[0][i]
             Plotter.sym_plot(ax, d, data.time, style = '--',
-                              color='gray')
+                             color='gray')
+            x_text = d[-1] if d[-1] <= 60 else 50
+            y_text = data.time[-1] if d[-1] <= 60\
+                else data.time[np.where(d > 60)[0][0]]
+            text = f"z={z:.1e}" if z > 1000 else f"z={int(z)}"
+            ax.text(0.9 * x_text, 0.9 * y_text, text, {'color': 'gray'})
         ax.plot([-60, 60], [today, today], 'k-', linewidth=0.5)
         ax.grid()
         ax.legend()
@@ -44,7 +53,8 @@ class Plotter:
         # Plotting the scale factor on the right y-axis
         ax_right = ax.twinx()
         ax_right.set_ylim(ax.get_ylim())
-        additional_ticks = np.arange(data.large_time[0], data.time[-1], 4)
+        additional_ticks = np.arange(data.large_time[0], data.time[-1],
+                                     (data.time[-1] - data.large_time[0]) / 9)
         ax_right.set_yticks(additional_ticks,
                             [round(sc_fc, 2) for sc_fc in a(additional_ticks)])
         ax_right.tick_params(axis='y', direction = 'in')

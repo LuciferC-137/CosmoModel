@@ -130,10 +130,10 @@ class DataHolder:
 class Units:
     """Class to hold constants."""
     c = 299792.458  # Speed of light in km/s
-    H0 = 67.15  # Hubble constant in s^-1 (converted from km/s/Mpc)
+    H0 = 67.15  # Hubble constant in km/s/Mpc
     Omega_m = 0.315  # Matter density parameter
     Omega_r = 0.000092136  # Radiation density parameter
-    Omega_lambda = 1 - Omega_m - Omega_r # Dark energy density parameter
+    Omega_lambda = 1. - Omega_m - Omega_r # Dark energy density parameter
 
     today = 13.842  # Age of the universe in Gyr
     a0 = 1.0  # Scale factor today
@@ -144,7 +144,7 @@ class Units:
     km_to_Mpc = 1 / 3.085e19
     km_to_Gpc = km_to_Mpc / 1e3
     pc_to_ly = 3.261
-    H0_per_Gyr = sec_in_Gyr * H0 * km_to_Mpc
+    H0_per_Gyr = sec_in_Gyr * H0 * km_to_Mpc # Hubble constant in Gyr^-1
     c_Glyr_per_Gyr = c * sec_in_Gyr * km_to_Gpc * pc_to_ly
     Lambda = Omega_lambda * 3 * H0 * H0 * km_to_Mpc * km_to_Mpc
 

@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
 from utils import DataHolder, Units
@@ -9,6 +10,7 @@ Logger().log("Starting...")
 
 # Filtering warnings for a cleaner output. When this is on, 
 # all print() functions must explicitly end with '\n' to make a new line.
+# This is already taken into account in the logger class.
 FilteredOutput.on()
 
 
@@ -62,7 +64,27 @@ def horizons_conformal(a: callable, time_conform: np.ndarray,
     Logger().log_prc_done("Light cone conformal")
 
     return p_h_comform, e_h_comform, h_s_comform, l_c_comform
-    
+
+def worldlines(a: callable,
+               time: np.ndarray, time_conformal: np.ndarray,
+               z_range: list) -> tuple[np.ndarray]:
+    """Calculate the curve iso-redshift. Returns the curve for:
+        - Proper distance, time
+        - Comoving distance, time
+        - Comoving distance, conformal time
+
+    In this form: (list[], list[], list[])
+    """
+    z_range = [0, 1, 3, 10, 1000]
+    chis = [chi_from_z(z) for z in z_range]
+    worldline, com_worldline, com_conf_worldline = [], [], []
+    for i in range(len(chis)):
+        Logger().log_prc("Calculating worldlines", i, len(chis))
+        worldline.append(iso_chi(a, time, chis[i]))
+        com_worldline.append(np.ones(len(time)) * chis[i])
+        com_conf_worldline.append(np.ones(len(time_conformal)) * chis[i])
+    Logger().log_prc_done("Calculating worldlines")
+    return worldline, com_worldline, com_conf_worldline
 
 # ------------------------- MAIN -------------------------
 
@@ -124,22 +146,17 @@ else:
     data_com.load_data(folder="saved/comoving")
     a = interp1d(data.large_time, data.a_vals)
 
-# Calculating worldlines (or isochrones) for different redshifts for the
-# proper distance plot.
-time = np.linspace(large_time[0], 25, 1000)
-zs = [0, 1, 3, 10, 1000, 1e10]
-chis = [chi_from_z(z) for z in zs]
-worldlines = []
-for chi in chis:
-    Logger().log_prc("Calculating worldlines", chi, chis[-1])
-    worldlines.append(iso_chi(a, time, chi))
-Logger().log_prc_done("Calculating worldlines")
+zs = [0, 1, 3, 10, 1000]
+z_worldlines = worldlines(a, data.time, data_conform.time, zs)
 
-Plotter.plot_horizons(data, a, name="horizons_proper",  worldlines=worldlines,
+Plotter.plot_horizons(data, a, name="horizons_proper",
+                      worldlines=(zs, z_worldlines[0]),
                       x_label="Proper Distance (Glyr)")
 Plotter.plot_horizons(data_com, a, name="horizons_comoving",
+                      worldlines=(zs, z_worldlines[1]),
                       x_label="Comoving Distance (Glyr)")
 Plotter.plot_horizons(data_conform, a, name="horizons_conformal",
+                      worldlines=(zs, z_worldlines[2]),
                       today=today_conformal,
                       x_label="Comoving Distance (Glyr)",
                       y_label="Conformal Time (Gyr)")
